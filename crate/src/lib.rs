@@ -57,7 +57,7 @@ pub fn run() -> Result<(), JsValue> {
     set_panic_hook();
 
     // Render content
-    render();
+    render()?;
 
     Ok(())
 }
@@ -80,68 +80,36 @@ fn render() -> Result<(), JsValue> {
         .collect();
 
     // Set up inner HTML
-    build_header_elem()?;
-    let grid_section = build_grid_section_elem(&data)?;
+    render_header()?;
+    let grid_section = render_grid_section(&data)?;
 
     // Manufacture the field we're gonna append
     for y in 0..data.len() {
         for x in 0..data[y].len() {
-            let elem = DOCUMENT.with(|document| document.borrow_mut().create_element("a"))?;
-            elem.set_class_name("cell");
-            elem.set_attribute("href", "#")?;
-            elem.set_inner_html(data[y][x]);
-
-            let listener = Closure::wrap(Box::new(move || {
-                MINESWEEPER.with(|ms| ms.borrow_mut().open((x, y)));
-                render();
-            }) as Box<dyn FnMut()>);
-
-            elem.add_event_listener_with_callback("click", listener.as_ref().unchecked_ref())?;
-
-            grid_section.append_child(&elem)?;
-
-            listener.forget();
+            let cell = get_cell_elem(data[y][x])?;
+            add_click_listener_to_cell(&cell, (x, y))?;
+            grid_section.append_child(&cell)?;
         }
     }
 
     Ok(())
 }
 
-fn build_header_elem() -> Result<Element, JsValue> {
-    let header = DOCUMENT.with(|document| document.borrow_mut().create_element("header"))?;
+fn render_header() -> Result<Element, JsValue> {
+    let header = create_dom_element("header")?;
     header.set_id("grid");
 
-    let listener = Closure::wrap(Box::new(move || {
-        MINESWEEPER.with(|ms| ms.borrow_mut().reset());
-        render();
-    }) as Box<dyn FnMut()>);
-    let button = DOCUMENT.with(|document| document.borrow_mut().create_element("button"))?;
-    button.set_id("reset");
-    button.set_inner_html(&String::from("Reset"));
-    button.add_event_listener_with_callback("click", listener.as_ref().unchecked_ref())?;
-
-    header.append_child(&button)?;
-    listener.forget();
-
-    let win_status = DOCUMENT.with(|document| document.borrow_mut().create_element("h1"))?;
-    win_status.set_id("win_status");
-    MINESWEEPER.with(|ms| {
-        if ms.borrow().is_game_over() {
-            win_status.set_attribute("style", &String::from("color: red"));
-            win_status.set_inner_html(&String::from("You lost 😞"));
-        } else if ms.borrow().is_game_finished() {
-            win_status.set_attribute("style", &String::from("color: green"));
-            win_status.set_inner_html(&String::from("You won 😎"));
-        }
-    });
+    let reset_button = get_reset_button_elem()?;
+    let win_status = get_win_status_elem()?;
+    header.append_child(&reset_button)?;
     header.append_child(&win_status)?;
 
-    ROOT.with(|root| root.borrow_mut().append_child(&header))?;
+    append_child_to_root(&header)?;
     Ok(header)
 }
 
-fn build_grid_section_elem(data: &Vec<Vec<&str>>) -> Result<Element, JsValue> {
-    let section = DOCUMENT.with(|document| document.borrow_mut().create_element("section"))?;
+fn render_grid_section(data: &Vec<Vec<&str>>) -> Result<Element, JsValue> {
+    let section = create_dom_element("section")?;
     let section_style = format!(
         "display:inline-grid; grid-template:repeat({}, auto)/repeat({}, auto)",
         data.len(),
@@ -151,6 +119,83 @@ fn build_grid_section_elem(data: &Vec<Vec<&str>>) -> Result<Element, JsValue> {
     section.set_id("grid");
     section.set_attribute("style", &section_style[..])?;
 
-    ROOT.with(|root| root.borrow_mut().append_child(&section))?;
+    append_child_to_root(&section)?;
     Ok(section)
+}
+
+fn get_reset_button_elem() -> Result<Element, JsValue> {
+    let button = create_dom_element("button")?;
+    button.set_id("reset");
+    button.set_inner_html(&String::from("Reset"));
+    add_click_listener_to_reset_button(&button)?;
+    Ok(button)
+}
+
+fn get_win_status_elem() -> Result<Element, JsValue> {
+    let win_status = create_dom_element("h1")?;
+    win_status.set_id("win_status");
+
+    MINESWEEPER.with(|ms| {
+        if ms.borrow().is_game_over() {
+            win_status
+                .set_attribute("style", &String::from("color: red"))
+                .unwrap();
+            win_status.set_inner_html(&String::from("You lost 😞"));
+        } else if ms.borrow().is_game_finished() {
+            win_status
+                .set_attribute("style", &String::from("color: green"))
+                .unwrap();
+            win_status.set_inner_html(&String::from("You won 😎"));
+        }
+    });
+
+    Ok(win_status)
+}
+
+fn get_cell_elem(cell_content: &str) -> Result<Element, JsValue> {
+    let elem = create_dom_element("a")?;
+    elem.set_class_name("cell");
+    elem.set_attribute("href", "#")?;
+    elem.set_inner_html(cell_content);
+
+    Ok(elem)
+}
+
+fn append_child_to_root(child: &Element) -> Result<(), JsValue> {
+    ROOT.with(|root| root.borrow_mut().append_child(child))?;
+    Ok(())
+}
+
+fn add_click_listener_to_reset_button(elem: &Element) -> Result<(), JsValue> {
+    let listener = Closure::wrap(Box::new(move || {
+        MINESWEEPER.with(|ms| ms.borrow_mut().reset());
+        render().unwrap();
+    }) as Box<dyn FnMut()>);
+
+    register_event_listener(elem, "click", listener)?;
+    Ok(())
+}
+
+fn add_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
+    let listener = Closure::wrap(Box::new(move || {
+        MINESWEEPER.with(|ms| ms.borrow_mut().open(pos));
+        render().unwrap();
+    }) as Box<dyn FnMut()>);
+
+    register_event_listener(elem, "click", listener)?;
+    Ok(())
+}
+
+fn create_dom_element(local_name: &str) -> Result<Element, JsValue> {
+    DOCUMENT.with(|document| document.borrow_mut().create_element(local_name))
+}
+
+fn register_event_listener(
+    elem: &Element,
+    event: &str,
+    listener: Closure<dyn FnMut()>,
+) -> Result<(), JsValue> {
+    elem.add_event_listener_with_callback(event, listener.as_ref().unchecked_ref())?;
+    listener.forget();
+    Ok(())
 }
