@@ -1,0 +1,43 @@
+html {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+}
+
+header {
+  margin-bottom: 1em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#reset {
+  width: 33%;
+  padding: 0.5em;
+  border-radius: 5px;
+  background-color: #707070;
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#win_status {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.cell {
+  text-decoration: none;
+  text-align: center;
+  color: #000;
+}
