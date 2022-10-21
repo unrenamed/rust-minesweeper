@@ -142,7 +142,7 @@ impl Display for Minesweeper {
             f.write_str("⬛ ")?;
           }
         } else if self.mines.contains(&pos) {
-          f.write_str("💣 ")?;
+          f.write_str("💥 ")?
         } else {
           let mine_count = self.adjacent_mines_count((x, y));
           if mine_count == 0 {
