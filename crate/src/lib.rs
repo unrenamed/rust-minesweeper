@@ -14,6 +14,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::Document;
 use web_sys::Element;
+use web_sys::Event;
 
 cfg_if! {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -87,7 +88,8 @@ fn render() -> Result<(), JsValue> {
     for y in 0..data.len() {
         for x in 0..data[y].len() {
             let cell = get_cell_elem(data[y][x])?;
-            add_click_listener_to_cell(&cell, (x, y))?;
+            add_left_click_listener_to_cell(&cell, (x, y))?;
+            add_right_click_listener_to_cell(&cell, (x, y))?;
             grid_section.append_child(&cell)?;
         }
     }
@@ -137,14 +139,10 @@ fn get_win_status_elem() -> Result<Element, JsValue> {
 
     MINESWEEPER.with(|ms| {
         if ms.borrow().is_game_over() {
-            win_status
-                .set_attribute("style", &String::from("color: red"))
-                .unwrap();
+            win_status.set_attribute("style", "color: red").unwrap();
             win_status.set_inner_html(&String::from("You lost 😞"));
         } else if ms.borrow().is_game_finished() {
-            win_status
-                .set_attribute("style", &String::from("color: green"))
-                .unwrap();
+            win_status.set_attribute("style", "color: green").unwrap();
             win_status.set_inner_html(&String::from("You won 😎"));
         }
     });
@@ -167,22 +165,35 @@ fn append_child_to_root(child: &Element) -> Result<(), JsValue> {
 }
 
 fn add_click_listener_to_reset_button(elem: &Element) -> Result<(), JsValue> {
-    let listener = Closure::wrap(Box::new(move || {
+    let listener = Closure::wrap(Box::new(move |e: Event| {
+        e.prevent_default();
         MINESWEEPER.with(|ms| ms.borrow_mut().reset());
         render().unwrap();
-    }) as Box<dyn FnMut()>);
+    }) as Box<dyn FnMut(Event)>);
 
     register_event_listener(elem, "click", listener)?;
     Ok(())
 }
 
-fn add_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
-    let listener = Closure::wrap(Box::new(move || {
+fn add_left_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
+    let listener = Closure::wrap(Box::new(move |e: Event| {
+        e.prevent_default();
         MINESWEEPER.with(|ms| ms.borrow_mut().open(pos));
         render().unwrap();
-    }) as Box<dyn FnMut()>);
+    }) as Box<dyn FnMut(Event)>);
 
     register_event_listener(elem, "click", listener)?;
+    Ok(())
+}
+
+fn add_right_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
+    let listener = Closure::wrap(Box::new(move |e: Event| {
+        e.prevent_default();
+        MINESWEEPER.with(|ms| ms.borrow_mut().toggle_flag(pos));
+        render().unwrap();
+    }) as Box<dyn FnMut(Event)>);
+
+    register_event_listener(elem, "contextmenu", listener)?;
     Ok(())
 }
 
@@ -193,7 +204,7 @@ fn create_dom_element(local_name: &str) -> Result<Element, JsValue> {
 fn register_event_listener(
     elem: &Element,
     event: &str,
-    listener: Closure<dyn FnMut()>,
+    listener: Closure<dyn FnMut(Event)>,
 ) -> Result<(), JsValue> {
     elem.add_event_listener_with_callback(event, listener.as_ref().unchecked_ref())?;
     listener.forget();

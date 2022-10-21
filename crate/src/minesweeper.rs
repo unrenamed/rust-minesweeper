@@ -55,22 +55,50 @@ impl Minesweeper {
     }
 
     pub fn open(&mut self, pos: Position) {
-        if self.is_game_over() || self.is_game_finished() || self.open_fields.contains(&pos) {
+        if self.is_game_over() || self.is_game_finished() || self.flagged_fields.contains(&pos) {
+            return;
+        }
+
+        let mines_count = self.adjacent_mines_count(pos);
+        let flags_count = self.adjacent_flags_count(pos);
+
+        if self.open_fields.contains(&pos) {
+            if mines_count == flags_count {
+                self.open_closed_neighbors(pos);
+            }
             return;
         }
 
         self.open_fields.insert(pos);
 
         let is_mine = self.mines.contains(&pos);
-
         if is_mine {
             self.game_over = true;
             return;
         }
 
-        if self.adjacent_mines_count(pos) == 0 {
-            for next in self.iter_neighbors(pos) {
-                self.open(next);
+        if mines_count == 0 {
+            self.open_closed_neighbors(pos);
+        };
+    }
+
+    pub fn toggle_flag(&mut self, pos: Position) {
+        if self.is_game_over() || self.is_game_finished() || self.open_fields.contains(&pos) {
+            return;
+        }
+
+        if !self.flagged_fields.contains(&pos) && self.flagged_fields.len() < self.mines.len() {
+            self.flagged_fields.insert(pos);
+            return;
+        }
+
+        self.flagged_fields.remove(&pos);
+    }
+
+    fn open_closed_neighbors(&mut self, pos: Position) {
+        for neighbor in self.iter_neighbors(pos) {
+            if !self.open_fields.contains(&neighbor) {
+                self.open(neighbor);
             }
         }
     }
@@ -89,6 +117,12 @@ impl Minesweeper {
             .filter(|pos| self.mines.contains(pos))
             .count() as u8
     }
+
+    fn adjacent_flags_count(&self, pos: Position) -> u8 {
+        self.iter_neighbors(pos)
+            .filter(|pos| self.flagged_fields.contains(pos))
+            .count() as u8
+    }
 }
 
 impl Display for Minesweeper {
@@ -100,6 +134,8 @@ impl Display for Minesweeper {
                 if !self.open_fields.contains(&pos) {
                     if self.game_over && self.mines.contains(&pos) {
                         f.write_str("💣 ")?;
+                    } else if self.flagged_fields.contains(&pos) {
+                        f.write_str("🚩 ")?;
                     } else {
                         f.write_str("⬛ ")?;
                     }
@@ -127,9 +163,10 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut ms = Minesweeper::new(10, 10, 4);
-
+        let mut ms = Minesweeper::new(10, 10, 5);
         ms.open((5, 5));
+        ms.toggle_flag((0, 0));
+        ms.open((0, 0));
 
         println!("{}", ms);
     }
