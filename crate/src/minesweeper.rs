@@ -1,4 +1,5 @@
-use crate::random::random_range;
+use crate::utils::FieldType;
+use crate::{random::random_range, utils::MineFieldBuilder};
 use std::{collections::HashSet, fmt::Display};
 
 type Position = (usize, usize);
@@ -159,29 +160,64 @@ impl Display for Minesweeper {
 
         if !self.open_fields.contains(&pos) {
           if self.game_over && self.mines.contains(&pos) {
-            f.write_str("💣 ")?;
+            write!(f, "{}", FieldType::Mine)?;
           } else if self.flagged_fields.contains(&pos) {
-            f.write_str("🚩 ")?;
+            write!(f, "{}", FieldType::Flag)?;
           } else if self.depressed_fields.contains(&pos) {
-            f.write_str("🔲 ")?;
+            write!(f, "{}", FieldType::Pressed)?;
           } else {
-            f.write_str("⬛ ")?;
+            write!(f, "{}", FieldType::Closed)?;
           }
         } else if self.mines.contains(&pos) {
-          f.write_str("💥 ")?
+          write!(f, "{}", FieldType::Exploded)?;
         } else {
           let mine_count = self.adjacent_mines_count((x, y));
           if mine_count == 0 {
-            f.write_str("⬜ ")?;
+            write!(f, "{}", FieldType::Opened)?;
           } else {
-            write!(f, " {} ", mine_count)?;
+            write!(f, "{}", FieldType::Num(mine_count))?;
           }
         }
       }
-      f.write_str("\n")?;
+      write!(f, "\n")?;
     }
 
     Ok(())
+  }
+}
+
+impl MineFieldBuilder for Minesweeper {
+  fn build(&self) -> Vec<Vec<FieldType>> {
+    let mut field = vec![vec![FieldType::Closed; self.width]; self.height];
+
+    for y in 0..self.height {
+      for x in 0..self.width {
+        let pos = (x, y);
+
+        if !self.open_fields.contains(&pos) {
+          if self.game_over && self.mines.contains(&pos) {
+            field[y][x] = FieldType::Mine;
+          } else if self.flagged_fields.contains(&pos) {
+            field[y][x] = FieldType::Flag;
+          } else if self.depressed_fields.contains(&pos) {
+            field[y][x] = FieldType::Pressed;
+          } else {
+            field[y][x] = FieldType::Closed;
+          }
+        } else if self.mines.contains(&pos) {
+          field[y][x] = FieldType::Exploded;
+        } else {
+          let mine_count = self.adjacent_mines_count((x, y));
+          if mine_count == 0 {
+            field[y][x] = FieldType::Opened;
+          } else {
+            field[y][x] = FieldType::Num(mine_count);
+          }
+        }
+      }
+    }
+
+    field
   }
 }
 

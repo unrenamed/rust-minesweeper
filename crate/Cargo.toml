@@ -38,7 +38,9 @@ features = [
   'Node',
   'Window',
   'Event',
+  'EventTarget',
   'MouseEvent',
+  'HtmlSelectElement',
 ]
 
 [features]

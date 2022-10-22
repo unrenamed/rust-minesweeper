@@ -21,19 +21,12 @@ header {
 }
 
 #reset {
-  width: 33%;
-  padding: 0.5em;
-  border-radius: 5px;
-  background-color: #707070;
-  font-size: 14px;
-  color: #fff;
-  font-weight: 600;
   cursor: pointer;
 }
 
 #win_status {
   margin: 0;
-  font-size: 1.5em;
+  font-size: 1.2em;
 }
 
 .cell {
