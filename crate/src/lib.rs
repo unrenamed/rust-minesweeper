@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::Document;
 use web_sys::Element;
-use web_sys::Event;
+use web_sys::MouseEvent;
 
 cfg_if! {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -88,8 +88,9 @@ fn render() -> Result<(), JsValue> {
   for y in 0..data.len() {
     for x in 0..data[y].len() {
       let cell = get_cell_elem(data[y][x])?;
-      add_left_click_listener_to_cell(&cell, (x, y))?;
-      add_right_click_listener_to_cell(&cell, (x, y))?;
+      add_mousedown_listener_to_cell(&cell, (x, y))?;
+      add_mouseup_listener_to_cell(&cell)?;
+      add_contexmenu_listener_to_cell(&cell)?;
       grid_section.append_child(&cell)?;
     }
   }
@@ -165,33 +166,46 @@ fn append_child_to_root(child: &Element) -> Result<(), JsValue> {
 }
 
 fn add_click_listener_to_reset_button(elem: &Element) -> Result<(), JsValue> {
-  let listener = Closure::wrap(Box::new(move |e: Event| {
+  let listener = Closure::wrap(Box::new(move |e: MouseEvent| {
     e.prevent_default();
     MINESWEEPER.with(|ms| ms.borrow_mut().reset());
     render().unwrap();
-  }) as Box<dyn FnMut(Event)>);
+  }) as Box<dyn FnMut(MouseEvent)>);
 
   register_event_listener(elem, "click", listener)?;
   Ok(())
 }
 
-fn add_left_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
-  let listener = Closure::wrap(Box::new(move |e: Event| {
+fn add_mousedown_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
+  let listener = Closure::wrap(Box::new(move |e: MouseEvent| {
     e.prevent_default();
-    MINESWEEPER.with(|ms| ms.borrow_mut().open(pos));
+    match e.button() {
+      0 => MINESWEEPER.with(|ms| ms.borrow_mut().open(pos)),
+      2 => MINESWEEPER.with(|ms| ms.borrow_mut().toggle_flag(pos)),
+      _ => (),
+    }
     render().unwrap();
-  }) as Box<dyn FnMut(Event)>);
+  }) as Box<dyn FnMut(MouseEvent)>);
 
-  register_event_listener(elem, "click", listener)?;
+  register_event_listener(elem, "mousedown", listener)?;
   Ok(())
 }
 
-fn add_right_click_listener_to_cell(elem: &Element, pos: (usize, usize)) -> Result<(), JsValue> {
-  let listener = Closure::wrap(Box::new(move |e: Event| {
+fn add_mouseup_listener_to_cell(elem: &Element) -> Result<(), JsValue> {
+  let listener = Closure::wrap(Box::new(move |e: MouseEvent| {
     e.prevent_default();
-    MINESWEEPER.with(|ms| ms.borrow_mut().toggle_flag(pos));
+    MINESWEEPER.with(|ms| ms.borrow_mut().clear_depressed_fields());
     render().unwrap();
-  }) as Box<dyn FnMut(Event)>);
+  }) as Box<dyn FnMut(MouseEvent)>);
+
+  register_event_listener(elem, "mouseup", listener)?;
+  Ok(())
+}
+
+fn add_contexmenu_listener_to_cell(elem: &Element) -> Result<(), JsValue> {
+  let listener = Closure::wrap(Box::new(move |e: MouseEvent| {
+    e.prevent_default();
+  }) as Box<dyn FnMut(MouseEvent)>);
 
   register_event_listener(elem, "contextmenu", listener)?;
   Ok(())
@@ -204,7 +218,7 @@ fn create_dom_element(local_name: &str) -> Result<Element, JsValue> {
 fn register_event_listener(
   elem: &Element,
   event: &str,
-  listener: Closure<dyn FnMut(Event)>,
+  listener: Closure<dyn FnMut(MouseEvent)>,
 ) -> Result<(), JsValue> {
   elem.add_event_listener_with_callback(event, listener.as_ref().unchecked_ref())?;
   listener.forget();

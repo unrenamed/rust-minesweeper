@@ -10,6 +10,7 @@ pub struct Minesweeper {
   mines: HashSet<Position>,
   open_fields: HashSet<Position>,
   flagged_fields: HashSet<Position>,
+  depressed_fields: HashSet<Position>,
   game_over: bool,
 }
 
@@ -21,6 +22,7 @@ impl Minesweeper {
       mines: Self::gen_rand_mines(width, height, mines_count),
       open_fields: HashSet::new(),
       flagged_fields: HashSet::new(),
+      depressed_fields: HashSet::new(),
       game_over: false,
     }
   }
@@ -29,21 +31,8 @@ impl Minesweeper {
     self.mines = Self::gen_rand_mines(self.width, self.height, self.mines.len());
     self.open_fields = HashSet::new();
     self.flagged_fields = HashSet::new();
+    self.depressed_fields = HashSet::new();
     self.game_over = false;
-  }
-
-  pub fn gen_rand_mines(
-    width: usize,
-    height: usize,
-    mines_count: usize,
-  ) -> HashSet<(usize, usize)> {
-    let mut mines = HashSet::new();
-
-    while mines.len() < mines_count {
-      mines.insert((random_range(0, width), random_range(0, height)));
-    }
-
-    mines
   }
 
   pub fn is_game_over(&self) -> bool {
@@ -65,6 +54,8 @@ impl Minesweeper {
     if self.open_fields.contains(&pos) {
       if mines_count == flags_count {
         self.open_closed_neighbors(pos);
+      } else if flags_count > 0 && flags_count < mines_count {
+        self.depress_neighbors(pos);
       }
       return;
     }
@@ -95,21 +86,22 @@ impl Minesweeper {
     self.flagged_fields.remove(&pos);
   }
 
-  fn open_closed_neighbors(&mut self, pos: Position) {
-    for neighbor in self.iter_neighbors(pos) {
-      if !self.open_fields.contains(&neighbor) {
-        self.open(neighbor);
-      }
+  pub fn clear_depressed_fields(&mut self) {
+    if self.depressed_fields.len() < 1 {
+      return;
     }
+
+    self.depressed_fields.clear();
   }
 
-  fn iter_neighbors(&self, (x, y): Position) -> impl Iterator<Item = Position> {
-    let width = self.width;
-    let height = self.height;
+  fn gen_rand_mines(width: usize, height: usize, mines_count: usize) -> HashSet<(usize, usize)> {
+    let mut mines = HashSet::new();
 
-    (x.max(1) - 1..=(x + 1).min(width - 1))
-      .flat_map(move |i| (y.max(1) - 1..=(y + 1).min(height - 1)).map(move |j| (i, j)))
-      .filter(move |&pos| pos != (x, y))
+    while mines.len() < mines_count {
+      mines.insert((random_range(0, width), random_range(0, height)));
+    }
+
+    mines
   }
 
   fn adjacent_mines_count(&self, pos: Position) -> u8 {
@@ -125,6 +117,38 @@ impl Minesweeper {
       .filter(|pos| self.flagged_fields.contains(pos))
       .count() as u8
   }
+
+  fn open_closed_neighbors(&mut self, pos: Position) {
+    for neighbor in self.iter_neighbors(pos) {
+      if !self.open_fields.contains(&neighbor) {
+        self.open(neighbor);
+      }
+    }
+  }
+
+  fn depress_neighbors(&mut self, pos: Position) {
+    for neighbor in self.iter_neighbors(pos) {
+      if !self.open_fields.contains(&neighbor) && !self.flagged_fields.contains(&neighbor) {
+        self.depress(neighbor);
+      }
+    }
+  }
+
+  fn depress(&mut self, pos: Position) {
+    if self.depressed_fields.contains(&pos) {
+      return;
+    }
+    self.depressed_fields.insert(pos);
+  }
+
+  fn iter_neighbors(&self, (x, y): Position) -> impl Iterator<Item = Position> {
+    let width = self.width;
+    let height = self.height;
+
+    (x.max(1) - 1..=(x + 1).min(width - 1))
+      .flat_map(move |i| (y.max(1) - 1..=(y + 1).min(height - 1)).map(move |j| (i, j)))
+      .filter(move |&pos| pos != (x, y))
+  }
 }
 
 impl Display for Minesweeper {
@@ -138,6 +162,8 @@ impl Display for Minesweeper {
             f.write_str("💣 ")?;
           } else if self.flagged_fields.contains(&pos) {
             f.write_str("🚩 ")?;
+          } else if self.depressed_fields.contains(&pos) {
+            f.write_str("🔲 ")?;
           } else {
             f.write_str("⬛ ")?;
           }
